@@ -6,7 +6,7 @@ Hydrogen Models
 Hydrogen in HII regions is typically assumed to follow Case B recombination
 theory.
 
-The values for the Case B recombination coefficients are given by [HummerStorey1987]_.  
+The values for the Case B recombination coefficients are given by [HummerStorey1987]_.
 They are also computed in [Hummer1994]_ and tabulated at a [wiki]_.  I had to OCR and pull
 out by hand some of the coefficients.
 
@@ -58,7 +58,7 @@ alphaB=[[1.2,8.823],
 
 
 # the command to make this:
-# %s/\v.*\n?([0-9]\.[0-9]+).*jH(.+\n?|[^β]\n?[0-9]\.[0-9]+) ?([0-9]\.[0-9]+) ([0-9]\.[0-9]+) ([0-9]\.[0-9]+)/[\1, \3, \4, \5]\r/ 
+# %s/\v.*\n?([0-9]\.[0-9]+).*jH(.+\n?|[^β]\n?[0-9]\.[0-9]+) ?([0-9]\.[0-9]+) ([0-9]\.[0-9]+) ([0-9]\.[0-9]+)/[\1, \3, \4, \5]\r/
 # from this:
 # http://www.scribd.com/doc/70881169/Physics-of-the-Interstellar-and-Intergalactic-Medium
 # with some by-hand editing too
@@ -166,7 +166,7 @@ for line in table14dot2['balmer']:
     r_to_hbeta["balmer"+line[0]] = np.array(line[2:])
     wavelength["balmer"+line[0]] = line[1]
 
-for series,values in table14dot2.iteritems():
+for series,values in table14dot2.items():
     if series == 'balmer':
         continue
     for line in values:
@@ -175,7 +175,7 @@ for series,values in table14dot2.iteritems():
 
 
 # not used right now, but it could be so I'm listing it here
-def rrl(n,dn=1,amu=1.007825):   
+def rrl(n,dn=1,amu=1.007825):
     """
     compute Radio Recomb Line freqs in GHz
     from Brown, Lockman & Knapp ARAA 1978 16 445
@@ -188,7 +188,7 @@ def find_lines(xarr):
     Given a :class:`pyspeckit.units.SpectrosopicAxis` instance, finds all the
     lines that are in bounds.  Returns a list of line names.
     """
-    return [linename for (linename,lam) in wavelength.iteritems() if xarr.as_unit('microns').in_range(lam)]
+    return [linename for (linename,lam) in wavelength.items() if xarr.as_unit('microns').in_range(lam)]
 
 def hydrogen_fitter(sp, temperature=10000, tiedwidth=False):
     """
@@ -199,7 +199,7 @@ def hydrogen_fitter(sp, temperature=10000, tiedwidth=False):
     *temperature* [ 5000, 10000, 20000 ]
         The case B coefficients are computed for 3 temperatures
 
-    *tiedwidth* [ bool ] 
+    *tiedwidth* [ bool ]
         Should the widths be tied?
 
     Returns a list of `tied` and `guesses` in the xarr's units
@@ -268,10 +268,10 @@ def hydrogen_model(xarr, amplitude=1.0, width=0.0, velocity=0.0, a_k=0.0, temper
     model += amplitude * np.exp(-(xarr-center)**2 / (2.0*lw)**2)
 
     for line in lines[1:]:
-        relamp = (r_to_hbeta[line][tnum]/r_to_hbeta[reference_line][tnum]) 
+        relamp = (r_to_hbeta[line][tnum]/r_to_hbeta[reference_line][tnum])
         lw = width / pyspeckit.units.speedoflight_kms * wavelength[line]
         center = wavelength[line]
-    
+
         model += amplitude * relamp * np.exp(-(xarr-center)**2 / (2.0*lw)**2)
 
     if a_k > 0:
@@ -286,13 +286,12 @@ def add_to_registry(sp):
     Add the Hydrogen model to the Spectrum's fitter registry
     """
     # can't have absorption in recombination case
-    extincted_hydrogen_emission = pyspeckit.models.model.SpectralModel(hydrogen_model, 4, 
+    extincted_hydrogen_emission = pyspeckit.models.model.SpectralModel(hydrogen_model, 4,
             shortvarnames=('A','\\sigma','\\Delta x','A_K'),
             parnames=['amplitude','width','velocity','extinction'],
-            parlimited=[(True,False),(True,False),(False,False), (True,False)], 
+            parlimited=[(True,False),(True,False),(False,False), (True,False)],
             parlimits=[(0,0), (0,0), (0,0), (0,0)],
             fitunits='microns')
 
     sp.Registry.add_fitter('hydrogen', extincted_hydrogen_emission,
             extincted_hydrogen_emission.npars, multisingle='multi')
-

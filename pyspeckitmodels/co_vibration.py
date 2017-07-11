@@ -34,7 +34,7 @@ try:
                                        units.unitdict['cgs']['kb']),
                                       name='T_low',))
 except Exception as ex:
-    print ex
+    print(ex)
     raise
 
 def tau_of_N(wavelength, column, tex=10, width=1.0, velocity=0.0, isotopomer=26, Be=57.63596828e9, unit_convention='cgs', width_units='km/s', velocity_units='km/s'):
@@ -186,11 +186,11 @@ except ImportError:
     pass
 
 if __name__=="__main__":
-    print "Predictions for G26.347307-0.41227641"
-    print "Best-fit line @ 33.3 km/s (2.4 kpc) has T_A(13CO) = 0.63 K -> N(12CO)=5.13e16 (sigma=1.5 km/s)"
-    print "Assuming tex=20"
+    print("Predictions for G26.347307-0.41227641")
+    print("Best-fit line @ 33.3 km/s (2.4 kpc) has T_A(13CO) = 0.63 K -> N(12CO)=5.13e16 (sigma=1.5 km/s)")
+    print("Assuming tex=20")
 
-    import agpy.blackbody
+    import blackbody
 
     x = np.linspace(2.30,2.47,600)
     x_superres = np.linspace(2.30,2.47,60000)
@@ -204,7 +204,8 @@ if __name__=="__main__":
     atm_averaged = np.concatenate([[(cont_superres*np.exp(-tau_atmospheric))[i::100] for i in range(100)]]).mean(axis=0)
 
     from astropy.io import fits
-    atmosphere = fits.getdata('/Users/adam/agpy/h2fit_support/atran2000.fits')
+    atmosphere = fits.getdata('/Users/adam/anaconda/envs/astropy35/h2fit/atran2000.fits')
+    #atmosphere = fits.getdata('/Users/adam/agpy/h2fit_support/atran2000.fits')
     
     import pylab
     pylab.figure(1)
@@ -218,9 +219,9 @@ if __name__=="__main__":
     pylab.title("G26.347-0.412")
     pylab.savefig('/Users/adam/work/cepheid_distance/CO_absorption_predicted_spectrum_G26.347-0.412.png')
 
-    print "Predictions for G26.419144-0.50988479"
-    print "Best-fit line @ 19.2 km/s (1.6 kpc) has T_A(13CO) = 0.98 K -> N(12CO)=7.98e16 (sigma=0.32 km/s)"
-    print "Assuming tex=20"
+    print("Predictions for G26.419144-0.50988479")
+    print("Best-fit line @ 19.2 km/s (1.6 kpc) has T_A(13CO) = 0.98 K -> N(12CO)=7.98e16 (sigma=0.32 km/s)")
+    print("Assuming tex=20")
 
     # 26.316284,-0.40536589  d>0.8 kpc   112.03646,113.08685   rms=0.12 max=0.30 (at 19 km/s), A=0.31 v=33.4 w=2.9
     # 26.278794,-0.42970377  d>1.6 kpc   118.14556,109.12947   rms=0.09 max=0.30
