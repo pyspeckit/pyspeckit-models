@@ -1,1 +1,1 @@
-from readcol import readcol
+from .readcol import readcol

@@ -37,7 +37,9 @@ except Exception as ex:
     print(ex)
     raise
 
-def tau_of_N(wavelength, column, tex=10, width=1.0, velocity=0.0, isotopomer=26, Be=57.63596828e9, unit_convention='cgs', width_units='km/s', velocity_units='km/s'):
+def tau_of_N(wavelength, column, tex=10, width=1.0, velocity=0.0,
+             isotopomer=26, Be=57.63596828e9, unit_convention='cgs',
+             width_units='km/s', velocity_units='km/s'):
     """
     Wavelength assumed to be an array cm
 

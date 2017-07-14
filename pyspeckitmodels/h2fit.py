@@ -1,5 +1,5 @@
 import pyspeckit
-from support import readcol
+from .support import readcol
 import numpy as np
 
 constants = pyspeckit.units.unitdict['cgs']
@@ -47,7 +47,7 @@ try:
             dl = .01/(resten[ju][vu]-resten[jl][vl])
             return dl * 1e6
 except IOError:
-    print "Could not find dalgarno1984_table5.txt.  H2 rest energies not available."
+    print("Could not find dalgarno1984_table5.txt.  H2 rest energies not available.")
 
 try:
     h2table = readcol(tablepath+'h2pars.txt',asStruct=True,skipafter=1)
@@ -108,7 +108,7 @@ try:
 
     atmotrans_vect = np.vectorize(atmotrans)
 except IOError:
-    print "Could not find atran.txt.  atran atmospheric transition model will not be available"
+    print("Could not find atran.txt.  atran atmospheric transition model will not be available")
 
 def modelspec(wavelength,T,A,w,dx,op,Ak=0,extinction=False):
     """
@@ -125,8 +125,8 @@ def modelspec(wavelength,T,A,w,dx,op,Ak=0,extinction=False):
     # assume width, shift given in velocity:
     w = w*np.mean(wavelength)/(constants['c']/1e5)
     dx = dx*np.mean(wavelength)/(constants['c']/1e5)
-    for v in xrange(1,6):
-        for j in xrange(1,14):
+    for v in range(1,6):
+        for j in range(1,14):
             if (j % 2):  # ortho/para multiplier
                 mult=op
             else: 
@@ -151,10 +151,10 @@ def tau_of_N(microns, column, v0=0, temperature=20, width=1.0, velocity=0.0, ort
     (absorption)
     """
     grounden = h2level_energy(0,0)
-    alllevelpop = np.sum([np.exp(-(h2level_energy(v,j)-grounden)/(k*temperature)) for v in xrange(0,6) for j in xrange(0,14)])
+    alllevelpop = np.sum([np.exp(-(h2level_energy(v,j)-grounden)/(k*temperature)) for v in range(0,6) for j in range(0,14)])
     tautotal = microns*0
-    for vu in xrange(1,6):
-        for j in xrange(0,14):
+    for vu in range(1,6):
+        for j in range(0,14):
             if (j % 2):  # ortho/para multiplier
                 mult=orthopara
             else: 
