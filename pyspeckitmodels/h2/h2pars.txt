@@ -1,3 +1,5 @@
+# see https://github.com/kfkaplan/make_H2_line_list (that was not used to make this, but should be used to replace it!)
+# these numbers (probably) come from Dalgarno 84
 line       microns   wavenum  g(J) Eupper   aval         vu  jl   trans
  name        (um)    (cm-1)	-     K   10e-7s       -   -     OQS
 0-0_S(0)   28.221     354.35    5     510   0.0003     0   0       S
