@@ -146,7 +146,7 @@ except ImportError:
     pass
 
 
-def modelemissionspectrum(xarr, column, extinction=None, tex=10, width=1.0, velocity=0.0, omega=4*np.pi, unit=None, **kwargs):
+def modelemissionspectrum(xarr, column, tex=10, width=1.0, velocity=0.0, extinction=None, omega=4*np.pi, unit=None, **kwargs):
     """
     CO model emission spectrum given an X-array and a total CO column
     WARNING: I'm writing this kinda late after a long day and not looking at textbooks;
