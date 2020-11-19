@@ -169,7 +169,7 @@ def modelemissionspectrum(xarr, column, extinction=None, tex=10, width=1.0, velo
 
     if extinction:
         # alpha=1.8 comes from Martin & Whittet 1990.  alpha=1.75 from Rieke and Lebofsky 1985
-        Al = extinction * (xax/2.2e-4)**(-1.75)
+        Al = extinction * (xax.to('cm').value/2.2e-4)**(-1.75)
         co_emi *= np.exp(-Al)
 
     return co_emi
@@ -194,7 +194,7 @@ def absorbed_blackbody(xarr, column, bbtemperature, omega, tex=10, width=1.0, ve
 
     if extinction:
         # alpha=1.8 comes from Martin & Whittet 1990.  alpha=1.75 from Rieke and Lebofsky 1985
-        Al = extinction * (xax/2.2e-4)**(-1.75)
+        Al = extinction * (xax.to('cm').value/2.2e-4)**(-1.75)
         model *= np.exp(-Al)
 
     return model
