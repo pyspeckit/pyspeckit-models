@@ -12,6 +12,8 @@ try:
 except ImportError:
     from numpy import convolve
 
+from . import blackbody
+
 try:
     import os
     path = os.path.split(os.path.realpath(__file__))[0]
@@ -57,6 +59,8 @@ def tau_of_N(wavelength, column, tex=10, width=1.0, velocity=0.0,
     prefactor = np.pi**0.5 * constants['e']**2 / constants['me'] / constants['c']
 
     all_iso = (all_lines['isotopomer']==isotopomer)
+    if hasattr(wavelength, 'to'):
+        wavelength = wavelength.to('cm').value
     OK_all_lines = (all_lines['wavelength']> wavelength.min()) * (all_lines['wavelength'] < wavelength.max()) * all_iso
 
     #model = np.ones(wavelength.shape)
@@ -113,7 +117,7 @@ def tau_of_N(wavelength, column, tex=10, width=1.0, velocity=0.0,
 try:
     import pyspeckit
 
-    def modelabsorptionspectrum(xarr, column, tex=10, width=1.0, velocity=0.0, units=None, **kwargs):
+    def modelabsorptionspectrum(xarr, column, tex=10, width=1.0, velocity=0.0, unit=None, **kwargs):
         """
         CO model absorption spectrum given an X-array and a total CO column
 
@@ -124,10 +128,10 @@ try:
         temperature : float
             Excitation temperature of the CO molecule
         """
-        if units is None:
+        if unit is None:
             xax = xarr.as_unit('cm')
         else:
-            xax = pyspeckit.units.SpectroscopicAxis(xarr, units=units)
+            xax = pyspeckit.units.SpectroscopicAxis(xarr, unit=unit)
 
         tau = tau_of_N(xax, column, tex=tex, width=width, velocity=velocity, **kwargs)
         co_model = np.exp(-tau)
@@ -138,82 +142,77 @@ try:
             parnames=['column','temperature','width','velocity'],
             fitunits='cm')
 
-    def modelemissionspectrum(xarr, column, extinction=None, tex=10, width=1.0, velocity=0.0, omega=4*np.pi, units=None, **kwargs):
-        """
-        CO model emission spectrum given an X-array and a total CO column
-        WARNING: I'm writing this kinda late after a long day and not looking at textbooks;
-        I may have the eqns for IR spectra _totally_ wrong...
+except ImportError:
+    pass
 
-        Parameters
-        ----------
-        xarr : `pyspeckit.spectrum.units.SpectroscopicAxis`
-            An X-axis instance (will be converted to cm)
-        temperature : float
-            Excitation temperature of the CO molecule
-        """
-        if units is None:
+
+def modelemissionspectrum(xarr, column, extinction=None, tex=10, width=1.0, velocity=0.0, omega=4*np.pi, unit=None, **kwargs):
+    """
+    CO model emission spectrum given an X-array and a total CO column
+    WARNING: I'm writing this kinda late after a long day and not looking at textbooks;
+    I may have the eqns for IR spectra _totally_ wrong...
+
+    Parameters
+    ----------
+    xarr : `pyspeckit.spectrum.units.SpectroscopicAxis`
+        An X-axis instance (will be converted to cm)
+    temperature : float
+        Excitation temperature of the CO molecule
+    """
+    if unit is None:
+        xax = xarr.as_unit('cm')
+    else:
+        xax = pyspeckit.units.SpectroscopicAxis(xarr, unit=unit)
+
+    tau = tau_of_N(xax, column, tex=tex, width=width, velocity=velocity, **kwargs)
+    co_emi = blackbody.blackbody_wavelength(xax.to('cm').value, tex, wavelength_units='cm', omega=omega, normalize=False) * (1.0-np.exp(-tau))
+
+    if extinction:
+        # alpha=1.8 comes from Martin & Whittet 1990.  alpha=1.75 from Rieke and Lebofsky 1985
+        Al = extinction * (xax/2.2e-4)**(-1.75)
+        co_emi *= np.exp(-Al)
+
+    return co_emi
+
+def absorbed_blackbody(xarr, column, bbtemperature, omega, tex=10, width=1.0, velocity=0.0, extinction=False, units=None, **kwargs):
+    """
+    CO model absorption on a blackbody
+    """
+    if units is None:
+        try:
             xax = xarr.as_unit('cm')
-        else:
-            xax = pyspeckit.units.SpectroscopicAxis(xarr, units=units)
+        except AttributeError:
+            raise AttributeError("Must specify units if xarr is not a SpectroscopicAxis instance.")
+    else:
+        xax = pyspeckit.units.SpectroscopicAxis(xarr, units=units).as_unit('cm')
 
-        tau = tau_of_N(xax, column, tex=tex, width=width, velocity=velocity, **kwargs)
-        co_emi = blackbody.blackbody_wavelength(xax, tex, wavelength_units='cm', omega=omega, normalize=False) * (1.0-np.exp(-tau))
+    bb = blackbody.blackbody_wavelength(xax.to('cm').value, bbtemperature, wavelength_units='cm', omega=omega, normalize=False)
+    co_tau = tau_of_N(xax, column, width=width, velocity=velocity, tex=tex, **kwargs)
+    co_emi = blackbody.blackbody_wavelength(xax.to('cm').value, tex, wavelength_units='cm', omega=omega, normalize=False) * (1.0-np.exp(-co_tau))
 
-        if extinction:
-            # alpha=1.8 comes from Martin & Whittet 1990.  alpha=1.75 from Rieke and Lebofsky 1985
-            Al = extinction * (xax/2.2e-4)**(-1.75)
-            co_emi *= np.exp(-Al)
+    model = bb*np.exp(-co_tau) + co_emi
 
-        return co_emi
+    if extinction:
+        # alpha=1.8 comes from Martin & Whittet 1990.  alpha=1.75 from Rieke and Lebofsky 1985
+        Al = extinction * (xax/2.2e-4)**(-1.75)
+        model *= np.exp(-Al)
 
-except ImportError:
-    pass
+    return model
 
-try:
-    import blackbody
-
-    def absorbed_blackbody(xarr, column, bbtemperature, omega, tex=10, width=1.0, velocity=0.0, extinction=False, units=None, **kwargs):
-        """
-        CO model absorption on a blackbody
-        """
-        if units is None:
-            try:
-                xax = xarr.as_unit('cm')
-            except AttributeError:
-                raise AttributeError("Must specify units if xarr is not a SpectroscopicAxis instance.")
-        else:
-            xax = pyspeckit.units.SpectroscopicAxis(xarr, units=units).as_unit('cm')
-
-        bb = blackbody.blackbody_wavelength(xax, bbtemperature, wavelength_units='cm', omega=omega, normalize=False)
-        co_tau = tau_of_N(xax, column, width=width, velocity=velocity, tex=tex, **kwargs)
-        co_emi = blackbody.blackbody_wavelength(xax, tex, wavelength_units='cm', omega=omega, normalize=False) * (1.0-np.exp(-co_tau))
-
-        model = bb*np.exp(-co_tau) + co_emi
-
-        if extinction:
-            # alpha=1.8 comes from Martin & Whittet 1990.  alpha=1.75 from Rieke and Lebofsky 1985
-            Al = extinction * (xax/2.2e-4)**(-1.75)
-            model *= np.exp(-Al)
-
-        return model
-
-    absorbed_blackbody_model = pyspeckit.models.model.SpectralModel(absorbed_blackbody, 5, 
-            shortvarnames=('N','T','\\Omega','\\sigma','\\Delta x'),
-            parnames=['column','temperature','omega','width','velocity'],
-            fitunits='cm')
-    absorbed_blackbody_model_texvar = pyspeckit.models.model.SpectralModel(absorbed_blackbody, 6, 
-            shortvarnames=('N','T','\\Omega','T_{ex}','\\sigma','\\Delta x'),
-            parnames=['column','temperature','omega','tex','width','velocity'],
-            fitunits='cm')
-    absorbed_blackbody_model_texvar_extinction = pyspeckit.models.model.SpectralModel(absorbed_blackbody, 7, 
-            shortvarnames=('N','T','\\Omega','T_{ex}','\\sigma','\\Delta x','A_K'),
-            parnames=['column','temperature','omega','tex','width','velocity','extinction'],
-            parlimits=[(1e10,1e20),(2.73,100000),(0,1),(2.73,10000),(0,1000),(0,0),(0,100)],
-            parlimited=[(True,True),(True,True),(True,True),(True,True),(True,True),(False,False),(True,True)],
-            fitunits='cm')
-
-except ImportError:
-    pass
+absorbed_blackbody_model = pyspeckit.models.model.SpectralModel(absorbed_blackbody, 5, 
+        shortvarnames=('N','T','\\Omega','\\sigma','\\Delta x'),
+        parnames=['column','temperature','omega','width','velocity'],
+        fitunits='cm')
+absorbed_blackbody_model_texvar = pyspeckit.models.model.SpectralModel(absorbed_blackbody, 6, 
+        shortvarnames=('N','T','\\Omega','T_{ex}','\\sigma','\\Delta x'),
+        parnames=['column','temperature','omega','tex','width','velocity'],
+        fitunits='cm')
+absorbed_blackbody_model_texvar_extinction = pyspeckit.models.model.SpectralModel(absorbed_blackbody, 7, 
+        shortvarnames=('N','T','\\Omega','T_{ex}','\\sigma','\\Delta x','A_K'),
+        parnames=['column','temperature','omega','tex','width','velocity','extinction'],
+        parlimits=[(1e10,1e20),(2.73,100000),(0,1),(2.73,10000),(0,1000),(0,0),(0,100)],
+        parlimited=[(True,True),(True,True),(True,True),(True,True),(True,True),(False,False),(True,True)],
+        fitunits='cm')
 
 if __name__=="__main__":
     print("Predictions for G26.347307-0.41227641")
