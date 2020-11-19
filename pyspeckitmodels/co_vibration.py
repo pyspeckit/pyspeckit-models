@@ -113,7 +113,7 @@ def tau_of_N(wavelength, column, tex=10, width=1.0, velocity=0.0,
 try:
     import pyspeckit
 
-    def modelspectrum(xarr, column, tex=10, width=1.0, velocity=0.0, units=None, **kwargs):
+    def modelabsorptionspectrum(xarr, column, tex=10, width=1.0, velocity=0.0, units=None, **kwargs):
         """
         CO model absorption spectrum given an X-array and a total CO column
 
@@ -133,10 +133,38 @@ try:
         co_model = np.exp(-tau)
         return co_model
 
-    absorption_model = pyspeckit.models.model.SpectralModel(modelspectrum, 4, 
+    absorption_model = pyspeckit.models.model.SpectralModel(modelabsorptionspectrum, 4, 
             shortvarnames=('N','T','\\sigma','\\Delta x'),
             parnames=['column','temperature','width','velocity'],
             fitunits='cm')
+
+    def modelemissionspectrum(xarr, column, extinction=None, tex=10, width=1.0, velocity=0.0, omega=4*np.pi, units=None, **kwargs):
+        """
+        CO model emission spectrum given an X-array and a total CO column
+        WARNING: I'm writing this kinda late after a long day and not looking at textbooks;
+        I may have the eqns for IR spectra _totally_ wrong...
+
+        Parameters
+        ----------
+        xarr : `pyspeckit.spectrum.units.SpectroscopicAxis`
+            An X-axis instance (will be converted to cm)
+        temperature : float
+            Excitation temperature of the CO molecule
+        """
+        if units is None:
+            xax = xarr.as_unit('cm')
+        else:
+            xax = pyspeckit.units.SpectroscopicAxis(xarr, units=units)
+
+        tau = tau_of_N(xax, column, tex=tex, width=width, velocity=velocity, **kwargs)
+        co_emi = blackbody.blackbody_wavelength(xax, tex, wavelength_units='cm', omega=omega, normalize=False) * (1.0-np.exp(-tau))
+
+        if extinction:
+            # alpha=1.8 comes from Martin & Whittet 1990.  alpha=1.75 from Rieke and Lebofsky 1985
+            Al = extinction * (xax/2.2e-4)**(-1.75)
+            co_emi *= np.exp(-Al)
+
+        return co_emi
 
 except ImportError:
     pass
@@ -145,7 +173,7 @@ try:
     import blackbody
 
     def absorbed_blackbody(xarr, column, bbtemperature, omega, tex=10, width=1.0, velocity=0.0, extinction=False, units=None, **kwargs):
-        """ 
+        """
         CO model absorption on a blackbody
         """
         if units is None:
@@ -161,7 +189,7 @@ try:
         co_emi = blackbody.blackbody_wavelength(xax, tex, wavelength_units='cm', omega=omega, normalize=False) * (1.0-np.exp(-co_tau))
 
         model = bb*np.exp(-co_tau) + co_emi
-        
+
         if extinction:
             # alpha=1.8 comes from Martin & Whittet 1990.  alpha=1.75 from Rieke and Lebofsky 1985
             Al = extinction * (xax/2.2e-4)**(-1.75)
