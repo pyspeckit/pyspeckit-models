@@ -1,6 +1,6 @@
 import pyspeckit
-from .support import readcol
 import numpy as np
+from astropy.io import ascii
 
 constants = pyspeckit.units.unitdict['cgs']
 
@@ -28,7 +28,7 @@ def h2level_energy(V,J):
 
 try:
     # read in rest energies before calling function
-    resten = readcol(tablepath+'dalgarno1984_table5.txt',verbose=0)
+    resten = np.loadtxt(tablepath+'dalgarno1984_table5.txt')
 
     def restwl(vu,vl,ju,jl,calc=False):
         """ Uses energy levels measured by Dabrowski & Herzberg, Can J. Physics, 62,1639,1984 
@@ -50,7 +50,7 @@ except IOError:
     print("Could not find dalgarno1984_table5.txt.  H2 rest energies not available.")
 
 try:
-    h2table = readcol(tablepath+'h2pars.txt',asStruct=True,skipafter=1)
+    h2table = ascii.read('h2pars.txt', header_start=0, data_start=2)
 
     def aval(vu,ju,jl):
         """
@@ -71,7 +71,7 @@ try:
             # strongly forbidden
             return 0 
 
-        wh = (h2table.jl==jl) * (h2table.trans==trans) * (h2table.vu==vu)
+        wh = (h2table['jl'] == jl) & (h2table['trans'] == trans) & (h2table['vu'] == vu)
         if wh.sum() == 0:
             return 0
             #raise ValueError("No valid matches")
