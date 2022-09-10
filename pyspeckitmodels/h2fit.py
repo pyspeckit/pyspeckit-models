@@ -84,10 +84,10 @@ except IOError:
 
 try:
     # atran = pyfits.open('/Users/adam/observations/triplespec/Spextool2/data/atran2000.fits')
-    atran = readcol(tablepath+'atran.txt')
+    atran = np.loadtxt(tablepath+'atran.txt')
     atran_wl = atran[:,0]*1e4
     atran_tr = atran[:,1]
-    atran_arc = readcol(tablepath+'atran_arcturus.txt')
+    atran_arc = np.loadtxt(tablepath+'atran_arcturus.txt')
     ARCSORT = argsort(atran_arc[:,0])
     atran_arcwl = atran_arc[ARCSORT,0]*1e4
     atran_arctr = atran_arc[ARCSORT,1]
