@@ -71,7 +71,7 @@ def tau_of_N(wavelength, column, tex=10, width=1.0, velocity=0.0,
 
     # slow - can this be approximated?
     valid = all_lines[all_iso]['T_low'] < tex * 5
-    vpartition_total = np.sum( [np.exp(-(line['vlo']+0.5) * constants['h'] / constants['kb'] / tex * constants['c'] * line['E_low']) 
+    vpartition_total = np.sum( [np.exp(-(line['vlo']+0.5) * constants['h'] / constants['kb'] / tex * constants['c'] * line['E_low'])
         for line in all_lines[all_iso][valid]] )
 
     lines = all_lines[OK_all_lines]
@@ -91,7 +91,7 @@ def tau_of_N(wavelength, column, tex=10, width=1.0, velocity=0.0,
 
         v_in_units = velocity*units.velocity_dict[velocity_units]/units.velocity_dict[constants['speed']]
 
-        lambda_off = constants['c'] / ( constants['c']/wav * (1.0+v_in_units/constants['c'])**-1 ) 
+        lambda_off = constants['c'] / ( constants['c']/wav * (1.0+v_in_units/constants['c'])**-1 )
         nu0 = constants['c'] / (lambda_off)
 
         u = constants['c'] * (nu0-nu)/nu0
@@ -107,7 +107,7 @@ def tau_of_N(wavelength, column, tex=10, width=1.0, velocity=0.0,
 
         #if fast:
         #    wavelength_center = np.median(wavelength)
-        #    kernel = np.exp( -(wavelength-wavelength_center)**2/(2*width / constants['c'] * wavelength_center) ) 
+        #    kernel = np.exp( -(wavelength-wavelength_center)**2/(2*width / constants['c'] * wavelength_center) )
 
         #    convolve(tau_total, kernel, mode='same')
 
@@ -137,7 +137,7 @@ try:
         co_model = np.exp(-tau)
         return co_model
 
-    absorption_model = pyspeckit.models.model.SpectralModel(modelabsorptionspectrum, 4, 
+    absorption_model = pyspeckit.models.model.SpectralModel(modelabsorptionspectrum, 4,
             shortvarnames=('N','T','\\sigma','\\Delta x'),
             parnames=['column','temperature','width','velocity'],
             fitunits='cm')
@@ -199,15 +199,15 @@ def absorbed_blackbody(xarr, column, bbtemperature, omega, tex=10, width=1.0, ve
 
     return model
 
-absorbed_blackbody_model = pyspeckit.models.model.SpectralModel(absorbed_blackbody, 5, 
+absorbed_blackbody_model = pyspeckit.models.model.SpectralModel(absorbed_blackbody, 5,
         shortvarnames=('N','T','\\Omega','\\sigma','\\Delta x'),
         parnames=['column','temperature','omega','width','velocity'],
         fitunits='cm')
-absorbed_blackbody_model_texvar = pyspeckit.models.model.SpectralModel(absorbed_blackbody, 6, 
+absorbed_blackbody_model_texvar = pyspeckit.models.model.SpectralModel(absorbed_blackbody, 6,
         shortvarnames=('N','T','\\Omega','T_{ex}','\\sigma','\\Delta x'),
         parnames=['column','temperature','omega','tex','width','velocity'],
         fitunits='cm')
-absorbed_blackbody_model_texvar_extinction = pyspeckit.models.model.SpectralModel(absorbed_blackbody, 7, 
+absorbed_blackbody_model_texvar_extinction = pyspeckit.models.model.SpectralModel(absorbed_blackbody, 7,
         shortvarnames=('N','T','\\Omega','T_{ex}','\\sigma','\\Delta x','A_K'),
         parnames=['column','temperature','omega','tex','width','velocity','extinction'],
         parlimits=[(1e10,1e20),(2.73,100000),(0,1),(2.73,10000),(0,1000),(0,0),(0,100)],
@@ -235,7 +235,7 @@ if __name__=="__main__":
     from astropy.io import fits
     atmosphere = fits.getdata('/Users/adam/anaconda/envs/astropy35/h2fit/atran2000.fits')
     #atmosphere = fits.getdata('/Users/adam/agpy/h2fit_support/atran2000.fits')
-    
+
     import pylab
     pylab.figure(1)
     pylab.clf()
@@ -258,7 +258,7 @@ if __name__=="__main__":
     # 26.403965,-0.5400639   d>1.2 kpc   97.86309 ,91.184737   rms=0.21 max=0.58
     # 26.30095,-0.55934725   d>1.8 kpc   114.62647,88.049232   rms=0.17 max=0.29
     # 26.316013,-0.55298208  d>2.3 kpc   112.17268,89.084219   rms=0.23 max=0.64
-    # 26.347307,-0.41227641  d>3.4 kpc   106.99591,111.96319   rms=0.09 max=0.26 (at 19km/s), A=0.70 v=33.3 w=1.75 
+    # 26.347307,-0.41227641  d>3.4 kpc   106.99591,111.96319   rms=0.09 max=0.26 (at 19km/s), A=0.70 v=33.3 w=1.75
     # 26.419144,-0.50988479  d>2.6 kpc   95.374313,96.091909   A=0.59  v=19.5  w=0.48
     # 26.252724,-0.44042119  d>2.3 kpc   122.3905 ,107.3868    weak/nondetection rms=0.10 max=0.26
     # 26.268552,-0.58696603  d>3.0 kpc   119.91491,83.558373   weak/nondetection rms=0.24 (max 0.63)
