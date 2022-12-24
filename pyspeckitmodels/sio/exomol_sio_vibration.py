@@ -168,3 +168,52 @@ def tau_of_N(wavelength, column, tex=10*u.K, width=1.0*u.km/u.s,
 
     assert tau_total.shape == wavelength.shape
     return tau_total
+
+
+
+def test():
+    numin, numax, dnu = 1.308467, 1.608467, 0.01
+    tex = 500
+    wavelengths = np.arange(numin, numax, dnu)*u.cm**-1
+
+    S = requests.Session()
+    S.headers['User-Agent'] = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/108.0.0.0 Safari/537.36'
+    url = "https://exomol.com/xsec/28Si-16O/"
+    resp = S.get(url)
+    resp.raise_for_status()
+    from bs4 import BeautifulSoup
+    soup = BeautifulSoup(resp.text)
+    csrfmiddlewaretoken = soup.find('input', {'name': 'csrfmiddlewaretoken'}).attrs['value']
+
+    resp2 = S.post(url, data={'dnu': dnu, 'numin': numin, 'numax': numax, 'T': tex, 'csrfmiddlewaretoken': csrfmiddlewaretoken},
+                   headers={'referer': 'https://exomol.com/xsec/28Si-16O/'})
+    resp2.raise_for_status()
+    # soup2 = BeautifulSoup(resp2.text)
+    baseurl = 'https://exomol.com'
+    sigmaurl = f'/results/28Si-16O_1-1_{tex}K_0.010000.sigma'
+    assert sigmaurl in resp2.text
+    resp3 = S.get(baseurl + sigmaurl)
+    resp3.raise_for_status()
+    sigmas = np.array(list(map(float, resp3.text.split())))
+
+    column = 1e15*u.cm**-2
+    tex = tex*u.K
+    width = np.sqrt(constants.k_B * tex / (44*u.Da)).to(u.km/u.s)
+    sigmas_calc = tau_of_N(wavelengths, column, tex=tex, width=width) / column
+
+    # these don't agree
+    # mine are higher by ~10^3
+    # 1896.67847777
+    # 100.0 K 5998.309367663244 cm2
+    # 500.0 K 2682.3881261813913 cm2
+    # 1000.0 K 1896.678477773368 cm2
+    # 10000.0 K 186.93839582512095 cm2
+    # so is this a problem with the partition function?
+    import pylab as pl
+    print(tex, sigmas_calc.max() / sigmas.max())
+    pl.clf()
+    pl.plot(wavelengths, sigmas, label='exomol')
+    pl.plot(wavelengths, sigmas_calc, label='calculated')
+    pl.legend(loc='best')
+
+    return sigmas, sigmas_calc
