@@ -8,47 +8,44 @@ import requests
 from astropy.io import ascii
 from astropy import units as u
 from astropy import constants
-from pyspeckit import units
-from astropy import table
-try:
-    import scipy.signal.fftconvolve as convolve
-except ImportError:
-    from numpy import convolve
 
-from astroquery.vizier import Vizier
+# from astroquery.vizier import Vizier
 from astropy.table import Table
 
 from tqdm.auto import tqdm
 
+from six import BytesIO
+import bz2
+
 import os
 path = os.path.split(os.path.realpath(__file__))[0]
-# path = '/Users/adam/repos/pyspeckit-models/pyspeckitmodels/sio/'
 
-# import requests
-# from six import BytesIO
-# import bz2
-#
-# resp = requests.get('https://exomol.com/db/SiO/28Si-16O/EBJT/28Si-16O__EBJT.trans.bz2')
+# resp = requests.get('https://exomol.com/db/SiO/12C-16O/EBJT/28Si-16O__EBJT.trans.bz2')
 # resp.raise_for_status()
 # tablefile = bz2.BZ2File(BytesIO(resp.content))
 # tbl = ascii.read(tablefile)
 
 
-levels_fn = os.path.join(path, 'sio_levels.ecsv')
+levels_fn = os.path.join(path, 'co_levels.ecsv')
 if os.path.exists(levels_fn):
     levels = Table.read(levels_fn)
 else:
-    levels = Vizier(row_limit=1e7).get_catalogs('J/MNRAS/434/1469/levels')[0]
-    levels.write(levels_fn)
-transitions_fn = os.path.join(path, 'sio_transitions.ecsv')
+    resp = requests.get('https://exomol.com/db/CO/12C-16O/Li2015/12C-16O__Li2015.states.bz2')
+    resp.raise_for_status
+    tablefile = bz2.BZ2File(BytesIO(resp.content))
+    levels = ascii.read(tablefile)
+
+transitions_fn = os.path.join(path, 'co_transitions.ecsv')
 if os.path.exists(transitions_fn):
     transitions = Table.read(transitions_fn)
 else:
-    transitions = Vizier(row_limit=1e8).get_catalogs('J/MNRAS/434/1469/transit')[0]
-    transitions.write(transitions_fn)
+    resp = requests.get('https://exomol.com/db/CO/12C-16O/Li2015/12C-16O__Li2015.trans.bz2')
+    resp.raise_for_status
+    tablefile = bz2.BZ2File(BytesIO(resp.content))
+    transitions = ascii.read(tablefile)
 
 
-transitions_enhanced_fn = os.path.join(path, 'sio_transitions_enhanced.ecsv')
+transitions_enhanced_fn = os.path.join(path, 'co_transitions_enhanced.ecsv')
 if os.path.exists(transitions_enhanced_fn):
     transitions = transitions_enhanced = Table.read(transitions_enhanced_fn)
 else:
@@ -82,11 +79,11 @@ else:
     transitions_enhanced['wavelength'] = wavelengths
     transitions_enhanced.write(transitions_enhanced_fn)
 
-partfunc_fn = os.path.join(path, 'sio_partfunc.ecsv')
+partfunc_fn = os.path.join(path, 'co_partfunc.ecsv')
 if os.path.exists(partfunc_fn):
     partfunc = Table.read(partfunc_fn)
 else:
-    resp = requests.get('https://exomol.com/db/SiO/28Si-16O/EBJT/28Si-16O__EBJT.pf')
+    resp = requests.get('https://exomol.com/db/CO/12C-16O/EBJT/28Si-16O__EBJT.pf')
     resp.raise_for_status()
     partfunc = ascii.read(resp.text)
     partfunc.rename_column('col1', 'temperature')
@@ -117,7 +114,6 @@ def tau_of_N(wavelength, column, tex=10*u.K, width=1.0*u.km/u.s,
     # not used prefactor = np.pi**0.5 * constants['e']**2 / constants['me'] / constants['c']
 
     wavelength = wavelength.to(u.cm, u.spectral())
-    # wavelength_icm = wavelength.to(u.cm**-1, u.spectral())
     trans = transitions[transitions['Mol'] == isotopomer]
     OK_all_lines = ((trans['wavelength'] > wavelength.min()) &
                     (trans['wavelength'] < wavelength.max()))
@@ -127,7 +123,7 @@ def tau_of_N(wavelength, column, tex=10*u.K, width=1.0*u.km/u.s,
     column = u.Quantity(column, u.cm**-2)
 
     if isotopomer != 2816:
-        raise NotImplementedError("Partition function only implemented for 28Si-16O; need to copy "
+        raise NotImplementedError("Partition function only implemented for 12C-16O; need to copy "
                                   "the coefficients from Barton+ 2013 table 4 for the others")
     partition_function = np.interp(tex.to(u.K).value, partfunc['temperature'], partfunc['Q'])
 
@@ -157,24 +153,24 @@ def tau_of_N(wavelength, column, tex=10*u.K, width=1.0*u.km/u.s,
         width_icm = width/constants.c * lambda_0.to(u.cm**-1, u.spectral())
 
         lineprofile = np.sqrt(1/(2*np.pi)) / width_icm * np.exp(-(wavelength-lambda_0)**2/(2*width_lambda**2))
-        # line prpfile integrates to 1
         # print((lineprofile.sum() * np.diff(wavelength_icm).mean()).decompose())
 
         # eqn 7
         crosssection = (intensity * lineprofile)
 
         tau_v = (crosssection * column).decompose()
-        # debug print(f'max tau: {tau_v.max()}')
+        # print(f'max tau: {tau_v.max()}')
         tau_total += tau_v
 
     assert tau_total.shape == wavelength.shape
     return tau_total
 
 
-def exomol_xsec(numin, numax, dnu, temperature):
+
+def exomol_xsec(numin, numax, dnu, temperature, molecule='12C-16O'):
     S = requests.Session()
     S.headers['User-Agent'] = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/108.0.0.0 Safari/537.36'
-    url = "https://exomol.com/xsec/28Si-16O/"
+    url = f"https://exomol.com/xsec/{molecule}/"
     resp = S.get(url)
     resp.raise_for_status()
     from bs4 import BeautifulSoup
@@ -183,11 +179,11 @@ def exomol_xsec(numin, numax, dnu, temperature):
 
     resp2 = S.post(url, data={'dnu': dnu, 'numin': numin, 'numax': numax, 'T': temperature,
                               'csrfmiddlewaretoken': csrfmiddlewaretoken},
-                   headers={'referer': 'https://exomol.com/xsec/28Si-16O/'})
+                   headers={'referer': url})
     resp2.raise_for_status()
     # soup2 = BeautifulSoup(resp2.text)
     baseurl = 'https://exomol.com'
-    sigmaurl = f'/results/28Si-16O_{int(numin)}-{int(numax)}_{temperature}K_{dnu:0.6f}.sigma'
+    sigmaurl = f'/results/{molecule}_{int(numin)}-{int(numax)}_{temperature}K_{dnu:0.6f}.sigma'
     assert sigmaurl in resp2.text
     resp3 = S.get(baseurl + sigmaurl)
     resp3.raise_for_status()
@@ -196,29 +192,11 @@ def exomol_xsec(numin, numax, dnu, temperature):
 
 
 def test():
-    numin, numax, dnu = 1.308467, 1.608467, 0.01
+    numin, numax, dnu = 3.8, 3.9, 0.01
     tex = 500
     wavelengths = np.arange(numin, numax, dnu)*u.cm**-1
 
-    S = requests.Session()
-    S.headers['User-Agent'] = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/108.0.0.0 Safari/537.36'
-    url = "https://exomol.com/xsec/28Si-16O/"
-    resp = S.get(url)
-    resp.raise_for_status()
-    from bs4 import BeautifulSoup
-    soup = BeautifulSoup(resp.text)
-    csrfmiddlewaretoken = soup.find('input', {'name': 'csrfmiddlewaretoken'}).attrs['value']
-
-    resp2 = S.post(url, data={'dnu': dnu, 'numin': numin, 'numax': numax, 'T': tex, 'csrfmiddlewaretoken': csrfmiddlewaretoken},
-                   headers={'referer': 'https://exomol.com/xsec/28Si-16O/'})
-    resp2.raise_for_status()
-    # soup2 = BeautifulSoup(resp2.text)
-    baseurl = 'https://exomol.com'
-    sigmaurl = f'/results/28Si-16O_1-1_{tex}K_0.010000.sigma'
-    assert sigmaurl in resp2.text
-    resp3 = S.get(baseurl + sigmaurl)
-    resp3.raise_for_status()
-    sigmas = np.array(list(map(float, resp3.text.split())))
+    sigmas = exomol_xsec(numin, numax, dnu, tex, molecule='12C-16O')
 
     column = 1e15*u.cm**-2
     tex = tex*u.K
