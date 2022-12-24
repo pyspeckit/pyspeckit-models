@@ -170,6 +170,29 @@ def tau_of_N(wavelength, column, tex=10*u.K, width=1.0*u.km/u.s,
     return tau_total
 
 
+def exomol_xsec(numin, numax, dnu, temperature):
+    S = requests.Session()
+    S.headers['User-Agent'] = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/108.0.0.0 Safari/537.36'
+    url = "https://exomol.com/xsec/28Si-16O/"
+    resp = S.get(url)
+    resp.raise_for_status()
+    from bs4 import BeautifulSoup
+    soup = BeautifulSoup(resp.text)
+    csrfmiddlewaretoken = soup.find('input', {'name': 'csrfmiddlewaretoken'}).attrs['value']
+
+    resp2 = S.post(url, data={'dnu': dnu, 'numin': numin, 'numax': numax, 'T': temperature,
+                              'csrfmiddlewaretoken': csrfmiddlewaretoken},
+                   headers={'referer': 'https://exomol.com/xsec/28Si-16O/'})
+    resp2.raise_for_status()
+    # soup2 = BeautifulSoup(resp2.text)
+    baseurl = 'https://exomol.com'
+    sigmaurl = f'/results/28Si-16O_{int(numin)}-{int(numax)}_{temperature}K_{dnu:0.6f}.sigma'
+    assert sigmaurl in resp2.text
+    resp3 = S.get(baseurl + sigmaurl)
+    resp3.raise_for_status()
+    sigmas = np.array(list(map(float, resp3.text.split())))
+    return sigmas
+
 
 def test():
     numin, numax, dnu = 1.308467, 1.608467, 0.01
