@@ -3,8 +3,9 @@ Model the absorption spectrum of vibrational states of a species retrieved from
 exomol
 """
 
-from astropy.io import ascii
 import numpy as np
+import requests
+from astropy.io import ascii
 from astropy import units as u
 from astropy import constants
 from pyspeckit import units
@@ -16,6 +17,8 @@ except ImportError:
 
 from astroquery.vizier import Vizier
 from astropy.table import Table
+
+from tqdm.auto import tqdm
 
 import os
 path = os.path.split(os.path.realpath(__file__))[0]
@@ -49,6 +52,7 @@ transitions_enhanced_fn = os.path.join(path, 'sio_transitions_enhanced.ecsv')
 if os.path.exists(transitions_enhanced_fn):
     transitions = transitions_enhanced = Table.read(transitions_enhanced_fn)
 else:
+    print("Calculating wavelengths, etc.  This may take a while")
     eupper = np.zeros(len(transitions), dtype=np.float64) * u.cm**-1
     elower = np.zeros(len(transitions), dtype=np.float64) * u.cm**-1
     gupper = np.zeros(len(transitions), dtype=np.int16)
@@ -78,10 +82,22 @@ else:
     transitions_enhanced['wavelength'] = wavelengths
     transitions_enhanced.write(transitions_enhanced_fn)
 
+partfunc_fn = os.path.join(path, 'sio_partfunc.ecsv')
+if os.path.exists(partfunc_fn):
+    partfunc = Table.read(partfunc_fn)
+else:
+    resp = requests.get('https://exomol.com/db/SiO/28Si-16O/EBJT/28Si-16O__EBJT.pf')
+    resp.raise_for_status()
+    partfunc = ascii.read(resp.text)
+    partfunc.rename_column('col1', 'temperature')
+    partfunc.rename_column('col2', 'Q')
+    partfunc.write(partfunc_fn)
+
 
 def tau_of_N(wavelength, column, tex=10*u.K, width=1.0*u.km/u.s,
              velocity=0.0*u.km/u.s,
              min_column=1e10,
+             progressbar=tqdm,
              isotopomer=2816, unit_convention='cgs',
              width_units='km/s', velocity_units='km/s'):
     """
@@ -101,53 +117,54 @@ def tau_of_N(wavelength, column, tex=10*u.K, width=1.0*u.km/u.s,
     # not used prefactor = np.pi**0.5 * constants['e']**2 / constants['me'] / constants['c']
 
     wavelength = wavelength.to(u.cm, u.spectral())
-    trans = transitions.loc[isotopomer]
+    #wavelength_icm = wavelength.to(u.cm**-1, u.spectral())
+    trans = transitions[transitions['Mol'] == isotopomer]
     OK_all_lines = ((trans['wavelength'] > wavelength.min()) &
                     (trans['wavelength'] < wavelength.max()))
     trans = trans[OK_all_lines]
 
     tau_total = np.zeros(wavelength.shape)
+    column = u.Quantity(column, u.cm**-2)
 
+    if isotopomer != 2816:
+        raise NotImplementedError("Partition function only implemented for 28Si-16O; need to copy "
+                                  "the coefficients from Barton+ 2013 table 4 for the others")
+    partition_function = np.interp(tex.to(u.K).value, partfunc['temperature'], partfunc['Q'])
 
-    # slow - can this be approximated?
-    # valid = all_lines[all_iso]['T_low'] < tex * 5
-    # vpartition_total = np.sum( [np.exp(-(line['vlo']+0.5) * constants['h'] / constants['kb'] / tex * constants['c'] * line['E_low'])
-    #     for line in all_lines[all_iso][valid]] )
-
-    # lines = all_lines[OK_all_lines]
-
-    for line in trans:
-        avalue = line['A']
-        wav = line['wavelength']
+    for line in progressbar(trans):
+        avalue = u.Quantity(line['A'], trans['A'].unit)
+        wav = u.Quantity(line['wavelength'], trans['wavelength'].unit)
         nu = wav.to(u.Hz, u.spectral())
         # https://en.wikipedia.org/wiki/Einstein_coefficients#Oscillator_strengths
         # SI: oscstrength = avalue / ( 2 * np.pi * nu**2 * constants.e**2 / (constants.eps0**2 * constants.m_e * constants.c**3))
         gu = line['gupper']
         gl = line['glower']
-        oscstrength = (gu/gl * avalue / ((2 * np.pi * nu**2 * constants.e.esu**2 / (
-            constants.m_e * constants.c**3)))).decompose()
+        # oscstrength = (gu/gl * avalue / ((2 * np.pi * nu**2 * constants.e.esu**2 / (
+        #     constants.m_e * constants.c**3)))).decompose()
 
-        lt = np.log10(tex.to(u.K).value)
+        elower = u.Quantity(line['elower'], trans['elower'].unit)
 
-        if isotopomer != 2816:
-            raise NotImplementedError("Partition function only implemented for 28Si-16O; need to copy "
-                                      "the coefficients from Barton+ 2013 table 4 for the others")
-
-        # polynomial from Barton+2013 Table 4
-        partition_function = (-4.289479066 + 7.19712692 * lt - 1.35646155*lt**2
-                              - 1.50671629*lt**3 - 1.50671629*lt**4 -
-                              0.1829250025*lt**5 + 0.0129066948*lt**6)
-
-        column_i = column * partition_function
-        if column_i < min_column:
-            continue
-
-        tau_0 = column_i * oscstrength
+        # from Yurchenko+ 2018 eqn 1
+        nu_icm = nu.to(u.cm**-1, u.spectral())
+        c2 = constants.h * constants.c / constants.k_B
+        intensity = (gu * avalue / (8 * np.pi * constants.c * (nu_icm**2))
+                     * np.exp(-elower * c2 / tex)
+                     * (1-np.exp(-c2 * nu_icm / tex))
+                     / partition_function).decompose()
 
         lambda_0 = velocity.to(u.um, u.doppler_optical(wav))
         width_lambda = width/constants.c * lambda_0
+        width_icm = width/constants.c * lambda_0.to(u.cm**-1, u.spectral())
 
-        tau_v = tau_0 * np.exp(-(wavelength - lambda_0)**2/(2*width_lambda**2))
+        lineprofile = np.sqrt(1/(2*np.pi)) / width_icm * np.exp(-(wavelength-lambda_0)**2/(2*width_lambda**2))
+        #print((lineprofile.sum() * np.diff(wavelength_icm).mean()).decompose())
+
+        # eqn 7
+        crosssection = (intensity * lineprofile)
+
+        tau_v = (crosssection * column).decompose()
+        #print(f'max tau: {tau_v.max()}')
         tau_total += tau_v
 
+    assert tau_total.shape == wavelength.shape
     return tau_total

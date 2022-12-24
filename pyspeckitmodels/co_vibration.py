@@ -1,5 +1,16 @@
 """
 Predict the CO fundamental/harmonic absorption for a given column density
+
+
+TODO: replace everything with
+https://ui.adsabs.harvard.edu/abs/2015ApJS..216...15L/abstract
+
+https://exomol.com/db/CO/12C-16O/Li2015/12C-16O__Li2015.trans.bz2
+https://exomol.com/db/CO/12C-16O/Li2015/12C-16O__Li2015.states.bz2
+https://exomol.com/db/CO/12C-16O/Li2015/12C-16O__Li2015.pf
+
+There's a pretty good chance I messed up the math when I wrote this as a grad
+student.  It looks like I never had a good reference spectrum to check against.
 """
 
 from astropy.io import ascii
