@@ -1,6 +1,11 @@
 """
 Model the absorption spectrum of vibrational states of a species retrieved from
 exomol
+
+References:
+
+    https://hitran.org/docs/definitions-and-units/
+    https://ui.adsabs.harvard.edu/abs/2018A%26A...614A.131Y/abstract
 """
 
 import warnings
@@ -179,9 +184,9 @@ def tau_of_N(wavelength, column, tex=10*u.K, width=1.0*u.km/u.s,
     # not used prefactor = np.pi**0.5 * constants['e']**2 / constants['me'] / constants['c']
 
     wavelength = wavelength.to(u.cm, u.spectral())
-    wavenumber = wavelength.to(u.cm**-1, u.spectral())
+    # wavenumber = wavelength.to(u.cm**-1, u.spectral())
     dx_icm = np.abs(wavelength[1].to(u.cm**-1, u.spectral())-wavelength[0].to(u.cm**-1, u.spectral()))
-    dx = np.abs(wavelength[1] - wavelength[0]).to(u.um)
+    # dx = np.abs(wavelength[1] - wavelength[0]).to(u.um)
 
     trans = transitions
     OK_all_lines = ((trans['wavelength'] > wavelength.min()) &
@@ -225,7 +230,7 @@ def tau_of_N(wavelength, column, tex=10*u.K, width=1.0*u.km/u.s,
         # sigma_v = sqrt(2 k T / m)
         # which is actually a factor of 4 off in the exponent?
         # eqn 15 of Yurchenko gives....
-        # HWHM = sqrt(2 ln 2) sigma
+        # HWHM = sqrt(2 ln 2) sigma = FWHM/2
         # FWHM = sqrt(8 ln 2) sigma
         # profile = e^(-(x-x0)^2 ln 2 / HWHM^2)
         #         = e^(-(x-x0)^2 ln 2 / (2 ln 2 sigma^2))
