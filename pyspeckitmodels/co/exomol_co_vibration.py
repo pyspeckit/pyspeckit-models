@@ -171,6 +171,8 @@ def tau_of_N(wavelength, column, tex=10*u.K, width=1.0*u.km/u.s,
         30Si16O would be 3016.
     wavelength : quantity
         wavelength
+    width : velocity
+        'sigma' width, i.e., the doppler width for a Gaussian distribution
     """
     # constants = units.unitdict[unit_convention]
 
@@ -222,6 +224,15 @@ def tau_of_N(wavelength, column, tex=10*u.K, width=1.0*u.km/u.s,
         # and the theoretical line width is
         # sigma_v = sqrt(2 k T / m)
         # which is actually a factor of 4 off in the exponent?
+        # eqn 15 of Yurchenko gives....
+        # HWHM = sqrt(2 ln 2) sigma
+        # FWHM = sqrt(8 ln 2) sigma
+        # profile = e^(-(x-x0)^2 ln 2 / HWHM^2)
+        #         = e^(-(x-x0)^2 ln 2 / (2 ln 2 sigma^2))
+        #         = e^(-(x-x0)^2 / (2 sigma^2))
+        # eq 16 is
+        # Doppler HWHM = sqrt(2 ln 2 k T / M)
+        #        sigma = sqrt(k T / M)
 
         # integrates to 1
         lineprofile = np.sqrt(1/(np.pi)) / width_icm * np.exp(-(wavelength-lambda_0)**2/(width_lambda**2)) * dx_icm
