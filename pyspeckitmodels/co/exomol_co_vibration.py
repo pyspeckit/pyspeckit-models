@@ -192,9 +192,9 @@ def tau_of_N(wavelength, column, tex=10*u.K, width=1.0*u.km/u.s,
     if isotopomer != 1216:
         raise NotImplementedError("Partition function only implemented for 12C-16O")
     partition_function = np.interp(tex.to(u.K).value, partfunc['temperature'], partfunc['Q'])
-    print(len(trans))
-    print("transition table: ", trans)
-    print()
+    # print(len(trans))
+    # print("transition table: ", trans)
+    # print()
 
     tex_to_icm = (tex * constants.k_B).to(u.cm**-1, u.spectral())
 
@@ -203,20 +203,29 @@ def tau_of_N(wavelength, column, tex=10*u.K, width=1.0*u.km/u.s,
         if elower > tex_to_icm * temperature_threshold:
             continue
 
-        print(f"Line: {line}")
+        # print(f"Line: {line}")
 
         wav = u.Quantity(line['wavelength'], trans['wavelength'].unit)
         lambda_0 = velocity.to(u.um, u.doppler_optical(wav))
         width_lambda = (width/constants.c * lambda_0).to(u.um)
         width_icm = (width/constants.c * lambda_0.to(u.cm**-1, u.spectral())).to(u.cm**-1)
-        print("widths", width_lambda, width_icm, width, dx, dx_icm)
-        print(f"partition function: {partition_function}")
+        # print("widths", width_lambda, width_icm, width, dx, dx_icm)
+        # print(f"partition function: {partition_function}")
 
         # the line profile has to integrate to 1 and has to have units of cm (inverse frequency) because integral f(nu) dnu = 1 (unitless)
 
+        # for reasons unknown, the Doppler profile adopted by exomol uses a Gaussian where the width is defined like this:
+        # e^(-(x-x0)^2 / sigma^2)
+        # where sigma = sqrt(k T / m)
+        # but a 'normal' Gaussian has profile
+        # e^(-(x-x0)^2 / (2 sigma^2))
+        # and the theoretical line width is
+        # sigma_v = sqrt(2 k T / m)
+        # which is actually a factor of 4 off in the exponent?
+
         # integrates to 1
-        lineprofile = np.sqrt(1/(2*np.pi)) / width_icm * np.exp(-(wavelength-lambda_0)**2/(2*width_lambda**2)) * dx_icm
-        print(f'lineprofile sum: {lineprofile.sum()}, lineprofile integral: {(lineprofile*dx_icm).sum().decompose()} dx={dx} dx_icm={dx_icm}.  Lineprofile max: {lineprofile.max()}')
+        lineprofile = np.sqrt(1/(np.pi)) / width_icm * np.exp(-(wavelength-lambda_0)**2/(width_lambda**2)) * dx_icm
+        # print(f'lineprofile sum: {lineprofile.sum()}, lineprofile integral: {(lineprofile*dx_icm).sum().decompose()} dx={dx} dx_icm={dx_icm}.  Lineprofile max: {lineprofile.max()}')
         # print((lineprofile.sum() * np.diff(wavelength_icm).mean()).decompose())
         if lineprofile.sum() == 0:
             warnings.warn("Line profile is zero, skipping.")
@@ -239,25 +248,25 @@ def tau_of_N(wavelength, column, tex=10*u.K, width=1.0*u.km/u.s,
                      * np.exp(-elower * c2 / tex)
                      * (1-np.exp(-c2 * nu_icm / tex))
                     ).decompose().to(u.cm)
-        print(wavelength.to(u.GHz, u.spectral()).min(),
-              wavelength.to(u.GHz, u.spectral()).max())
-        cdmsq = CDMS.query_lines(wavelength.to(u.GHz, u.spectral()).min(),
-                                 wavelength.to(u.GHz, u.spectral()).max(),
-                                 min_strength=-500,
-                                 molecule="028503 CO",
-                                 temperature_for_intensity=tex.value)[0]
-        print(cdmsq)
-        cdmslgint = 10**cdmsq['LGINT']
-        cdmsint = cdmslgint * u.MHz * u.nm**2
-        cdmsint_icm = (cdmsint / constants.c).to(intensity.unit)
-        print(f"Intensity: {intensity}.  CDMS intensity={cdmslgint} -> {cdmsint} -> {cdmsint_icm} Wavelength={wav.to(u.um)}, frequency={wav.to(u.GHz, u.spectral())}")
-        print(f"CDMS / our intensity: {cdmsint_icm / intensity}")
+        # print(wavelength.to(u.GHz, u.spectral()).min(), wavelength.to(u.GHz, u.spectral()).max())
+        # cdmsq = CDMS.query_lines(wavelength.to(u.GHz, u.spectral()).min(),
+        #                          wavelength.to(u.GHz, u.spectral()).max(),
+        #                          min_strength=-500,
+        #                          molecule="028503 CO",
+        #                          temperature_for_intensity=tex.value)[0]
+        # # print(cdmsq)
+        # cdmslgint = 10**cdmsq['LGINT']
+        # cdmsint = cdmslgint * u.MHz * u.nm**2
+        # cdmsint_icm = (cdmsint / constants.c).to(intensity.unit)
+        # print(f"Intensity: {intensity}.  CDMS intensity={cdmslgint} -> {cdmsint} -> {cdmsint_icm} Wavelength={wav.to(u.um)}, frequency={wav.to(u.GHz, u.spectral())}")
+        # print(f"CDMS / our intensity: {cdmsint_icm / intensity}")
 
 
 
+        # using this to hack the units "right" - trying to solve 6 order of magnitude disagreement...
         # eqn 7
-        crosssection = (intensity * lineprofile / wavenumber)
-        print(f"Max cross-section: {crosssection.max().to(u.cm**2)}     =     {crosssection.max().to(u.barn)}")
+        crosssection = (intensity * lineprofile) / dx_icm
+        # print(f"Max cross-section: {crosssection.max().to(u.cm**2)}     =     {crosssection.max().to(u.barn)}")
 
         tau_v = (crosssection * column).decompose()
         # print(f'max tau: {tau_v.max()}')
@@ -343,17 +352,66 @@ def test2():
     import pylab as pl
     print(f"tex={tex}, max calc: {sigmas_calc.max()} max downloaded: {sigmas.max()} ratio={sigmas_calc.max() / sigmas.max()}")
     pl.clf()
-    pl.plot(wavelengths, sigmas, label='exomol')
-    pl.plot(wavelengths, sigmas_calc, label='calculated')
+    dnu = wavelengths[1]-wavelengths[0]
+    pl.plot(wavelengths, sigmas/dnu, label='exomol')
+    pl.plot(wavelengths, sigmas_calc/dnu, label='calculated')
     pl.xlabel("Wavelength [cm$^{-1}$]")
     pl.ylabel("Cross Section [cm$^{-2}$]")
 
     wavelengths2 = np.linspace(numin, numax, 100000)*u.cm**-1
+    dnu = wavelengths2[1]-wavelengths2[0]
     sigmas_calc_2 = tau_of_N(wavelengths2, column, tex=tex, width=width) / column
-    pl.plot(wavelengths2, sigmas_calc_2, label='calculated2')
+    pl.plot(wavelengths2, sigmas_calc_2/dnu, label='calculated2')
     pl.semilogy()
     pl.ylim(1e-35, 1e-15)
     pl.legend(loc='best')
 
     return sigmas, sigmas_calc
 
+
+def test_tloop():
+    # numin, numax, dnu = 3.815033, 3.895033, 0.01
+    # numin, numax, dnu = 2142.245, 2143.245, 0.01
+
+    numin, numax, dnu = 2147.081139-0.01*11, 2147.081139+0.01*11, 0.01
+    tems = np.linspace(100, 5000, 9)
+    ratios = []
+    ratios2 = []
+    import pylab as pl
+    fig = pl.figure(1)
+    for ii, tex in enumerate(tems[::-1]):
+        tex = int(tex)
+        wavelengths = np.arange(numin, numax + dnu/2, dnu)*u.cm**-1
+
+        sigmas = exomol_xsec(numin, numax, dnu, tex, molecule='12C-16O')
+
+        column = 1e15*u.cm**-2
+        tex = tex*u.K
+        width = np.sqrt(constants.k_B * tex / (28*u.Da)).to(u.km/u.s)
+        sigmas_calc = tau_of_N(wavelengths, column, tex=tex, width=width, progressbar=lambda x: x) / column
+
+        ax = pl.subplot(3, 3, ii+1)
+        ax.cla()
+        pl.plot(wavelengths, sigmas, label='exomol')
+        pl.plot(wavelengths, sigmas_calc, label='calculated')
+
+        wavelengths2 = np.linspace(numin, numax, 100000)*u.cm**-1
+        sigmas_calc_2 = tau_of_N(wavelengths2, column, tex=tex, width=width, progressbar=lambda x: x) / column
+        pl.plot(wavelengths2, sigmas_calc_2, label='calculated2')
+        pl.semilogy()
+        ymin, ymax = pl.ylim()
+        pl.ylim(1e-30, ymax)
+        pl.legend(loc='best')
+        pl.xlabel("Wavelength [cm$^{-1}$]")
+        pl.ylabel("Cross Section [cm$^{-2}$]")
+        pl.title(tex)
+
+        print(f"tex={tex}, max calc: {sigmas_calc.max()} max downloaded: {sigmas.max()} ratio={sigmas_calc.max() / sigmas.max()}, {sigmas_calc_2.max()/sigmas.max()}")
+        ratios.append((sigmas_calc.max() / sigmas.max()).decompose().value)
+        ratios2.append((sigmas_calc_2.max() / sigmas.max()).decompose().value)
+
+    fig = pl.figure(2)
+    fig.clf()
+    pl.semilogy(tems[::-1], ratios)
+    pl.semilogy(tems[::-1], ratios2)
+    return sigmas, sigmas_calc, ratios, ratios2
