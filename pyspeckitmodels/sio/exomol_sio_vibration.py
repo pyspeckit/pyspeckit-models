@@ -5,6 +5,7 @@ exomol
 
 import numpy as np
 import requests
+import warnings
 from astropy.io import ascii
 from astropy import units as u
 from astropy import constants
@@ -67,10 +68,11 @@ else:
         # should already be sorted, but just to be sure
         sublevels.sort('i')
         # indices are the transition number minus one
-        eupper[transmatches] = sublevels[subtrans['i1']-1]['E']
-        elower[transmatches] = sublevels[subtrans['i0']-1]['E']
-        gupper[transmatches] = sublevels[subtrans['i1']-1]['g']
-        glower[transmatches] = sublevels[subtrans['i0']-1]['g']
+        eupper[transmatches] = sublevels[subtrans['i0']-1]['E']
+        elower[transmatches] = sublevels[subtrans['i1']-1]['E']
+        gupper[transmatches] = sublevels[subtrans['i0']-1]['g']
+        glower[transmatches] = sublevels[subtrans['i1']-1]['g']
+        assert np.all(eupper > elower)
 
     wavelengths = (eupper - elower).to(u.um, u.spectral())
 
@@ -98,6 +100,7 @@ def tau_of_N(wavelength, column, tex=10*u.K, width=1.0*u.km/u.s,
              velocity=0.0*u.km/u.s,
              min_column=1e10,
              progressbar=tqdm,
+             norm_threshold=1e-4,
              isotopomer=2816, unit_convention='cgs',
              width_units='km/s', velocity_units='km/s'):
     """
@@ -159,6 +162,9 @@ def tau_of_N(wavelength, column, tex=10*u.K, width=1.0*u.km/u.s,
         lineprofile = np.sqrt(1/(2*np.pi)) / width_icm * np.exp(-(wavelength-lambda_0)**2/(2*width_lambda**2))
         # line prpfile integrates to 1
         # print((lineprofile.sum() * np.diff(wavelength_icm).mean()).decompose())
+        if lineprofile.sum() < 1-norm_threshold:
+            warnings.warn("Line profile is not normalized.  Sum is {lineprofile.sum():0.2g}")
+            lineprofile /= lineprofile.sum()
 
         # eqn 7
         crosssection = (intensity * lineprofile)
@@ -171,23 +177,23 @@ def tau_of_N(wavelength, column, tex=10*u.K, width=1.0*u.km/u.s,
     return tau_total
 
 
-def exomol_xsec(numin, numax, dnu, temperature):
+def exomol_xsec(numin, numax, dnu, temperature, molecule='28Si-16O'):
     S = requests.Session()
     S.headers['User-Agent'] = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/108.0.0.0 Safari/537.36'
-    url = "https://exomol.com/xsec/28Si-16O/"
+    url = f"https://exomol.com/xsec/{molecule}/"
     resp = S.get(url)
     resp.raise_for_status()
     from bs4 import BeautifulSoup
-    soup = BeautifulSoup(resp.text)
+    soup = BeautifulSoup(resp.text, 'html5')
     csrfmiddlewaretoken = soup.find('input', {'name': 'csrfmiddlewaretoken'}).attrs['value']
 
     resp2 = S.post(url, data={'dnu': dnu, 'numin': numin, 'numax': numax, 'T': temperature,
                               'csrfmiddlewaretoken': csrfmiddlewaretoken},
-                   headers={'referer': 'https://exomol.com/xsec/28Si-16O/'})
+                   headers={'referer': url})
     resp2.raise_for_status()
-    # soup2 = BeautifulSoup(resp2.text)
+    # soup2 = BeautifulSoup(resp2.text, 'html5')
     baseurl = 'https://exomol.com'
-    sigmaurl = f'/results/28Si-16O_{int(numin)}-{int(numax)}_{temperature}K_{dnu:0.6f}.sigma'
+    sigmaurl = f'/results/{molecule}_{int(numin)}-{int(numax)}_{temperature}K_{dnu:0.6f}.sigma'
     assert sigmaurl in resp2.text
     resp3 = S.get(baseurl + sigmaurl)
     resp3.raise_for_status()
@@ -206,13 +212,13 @@ def test():
     resp = S.get(url)
     resp.raise_for_status()
     from bs4 import BeautifulSoup
-    soup = BeautifulSoup(resp.text)
+    soup = BeautifulSoup(resp.text, 'html5')
     csrfmiddlewaretoken = soup.find('input', {'name': 'csrfmiddlewaretoken'}).attrs['value']
 
     resp2 = S.post(url, data={'dnu': dnu, 'numin': numin, 'numax': numax, 'T': tex, 'csrfmiddlewaretoken': csrfmiddlewaretoken},
                    headers={'referer': 'https://exomol.com/xsec/28Si-16O/'})
     resp2.raise_for_status()
-    # soup2 = BeautifulSoup(resp2.text)
+    # soup2 = BeautifulSoup(resp2.text, 'html5')
     baseurl = 'https://exomol.com'
     sigmaurl = f'/results/28Si-16O_1-1_{tex}K_0.010000.sigma'
     assert sigmaurl in resp2.text
@@ -239,5 +245,51 @@ def test():
     pl.plot(wavelengths, sigmas, label='exomol')
     pl.plot(wavelengths, sigmas_calc, label='calculated')
     pl.legend(loc='best')
+
+    wavelengths2 = np.linspace(numin, numax, 100000)*u.cm**-1
+    sigmas_calc_2 = tau_of_N(wavelengths2, column, tex=tex, width=width) / column
+    pl.plot(wavelengths2, sigmas_calc_2, label='calculated2')
+    pl.semilogy()
+    pl.ylim(1e-30, 1e-18)
+    pl.legend(loc='best')
+
+
+    return sigmas, sigmas_calc
+
+def test2():
+    numin, numax, dnu = 1176, 1265, 0.01
+    tex = 100
+    wavelengths = np.arange(numin, numax+dnu/2, dnu)*u.cm**-1
+
+    sigmas = exomol_xsec(numin, numax, dnu, tex, molecule='28S-16O')
+
+    column = 1e15*u.cm**-2
+    tex = tex*u.K
+    width = np.sqrt(constants.k_B * tex / (28*u.Da)).to(u.km/u.s)
+    sigmas_calc = tau_of_N(wavelengths, column, tex=tex, width=width) / column
+
+    # these don't agree
+    # mine are higher by ~10^3
+    # 1896.67847777
+    # 100.0 K 5998.309367663244 cm2
+    # 500.0 K 2682.3881261813913 cm2
+    # 1000.0 K 1896.678477773368 cm2
+    # 10000.0 K 186.93839582512095 cm2
+    # so is this a problem with the partition function?
+    import pylab as pl
+    print(f"tex={tex}, max calc: {sigmas_calc.max()} max downloaded: {sigmas.max()} ratio={sigmas_calc.max() / sigmas.max()}")
+    pl.clf()
+    pl.plot(wavelengths, sigmas, label='exomol')
+    pl.plot(wavelengths, sigmas_calc, label='calculated')
+    pl.xlabel("Wavelength [cm$^{-1}$]")
+    pl.ylabel("Cross Section [cm$^{-2}$]")
+
+    wavelengths2 = np.linspace(numin, numax, 100000)*u.cm**-1
+    sigmas_calc_2 = tau_of_N(wavelengths2, column, tex=tex, width=width) / column
+    pl.plot(wavelengths2, sigmas_calc_2, label='calculated2')
+    pl.semilogy()
+    pl.ylim(1e-35, 1e-15)
+    pl.legend(loc='best')
+
 
     return sigmas, sigmas_calc
