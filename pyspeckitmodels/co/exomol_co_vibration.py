@@ -184,11 +184,17 @@ def tau_of_N(wavelength, column, tex=10*u.K, width=1.0*u.km/u.s,
 
     # not used prefactor = np.pi**0.5 * constants['e']**2 / constants['me'] / constants['c']
 
-    column = u.Quantity(column, u.cm**-2)
-    wavelength = u.Quantity(wavelength, u.cm).to(u.cm, u.spectral())
-    tex = u.Quantity(tex, u.K)
-    width = u.Quantity(width, u.km/u.s)
-    velocity = u.Quantity(velocity, u.km/u.s)
+    if not hasattr(column, 'unit'):
+        column = u.Quantity(column, u.cm**-2)
+    if not hasattr(wavelength, 'unit'):
+        wavelength = u.Quantity(wavelength, u.cm)
+    wavelength = wavelength.to(u.um, u.spectral())
+    if not hasattr(tex, 'unit'):
+        tex = u.Quantity(tex, u.K)
+    if not hasattr(width, 'unit'):
+        width = u.Quantity(width, u.km/u.s)
+    if not hasattr(velocity, 'unit'):
+        velocity = u.Quantity(velocity, u.km/u.s)
 
     # wavenumber = wavelength.to(u.cm**-1, u.spectral())
     dx_icm = np.abs(wavelength[1].to(u.cm**-1, u.spectral())-wavelength[0].to(u.cm**-1, u.spectral()))
@@ -396,7 +402,7 @@ def test_tloop():
     # numin, numax, dnu = 3.815033, 3.895033, 0.01
     # numin, numax, dnu = 2142.245, 2143.245, 0.01
 
-    numin, numax, dnu = 2147.081139-0.01*11, 2147.081139+0.01*11, 0.01
+    numin, numax, dnu = 2147.081139-0.01*61, 2147.081139+0.01*61, 0.01
     tems = np.linspace(100, 5000, 9)
     ratios = []
     ratios2 = []
@@ -421,9 +427,10 @@ def test_tloop():
         wavelengths2 = np.linspace(numin, numax, 100000)*u.cm**-1
         sigmas_calc_2 = tau_of_N(wavelengths2, column, tex=tex, width=width, progressbar=lambda x: x) / column
         pl.plot(wavelengths2, sigmas_calc_2, label='calculated2')
+        pl.axhline(1e-18, linestyle='--', color='k')
         pl.semilogy()
         ymin, ymax = pl.ylim()
-        pl.ylim(1e-30, ymax)
+        pl.ylim(1e-25, 1e-15)
         pl.legend(loc='best')
         pl.xlabel("Wavelength [cm$^{-1}$]")
         pl.ylabel("Cross Section [cm$^{-2}$]")
@@ -439,6 +446,41 @@ def test_tloop():
     pl.semilogy(tems[::-1], ratios2)
     return sigmas, sigmas_calc, ratios, ratios2
 
+
+def plot_tloop():
+    # numin, numax, dnu = 3.815033, 3.895033, 0.01
+    # numin, numax, dnu = 2142.245, 2143.245, 0.01
+
+    xarr = np.linspace(4.56581*u.um, 4.74688*u.um, int(1e5))
+    tems = np.linspace(10, 150, 9)
+    import pylab as pl
+    fig = pl.figure(1)
+    fig.clf()
+    for ii, tex in enumerate(tems[::-1]):
+        tex = int(tex)
+
+        column = 1e15*u.cm**-2
+        tex = tex*u.K
+        width = np.sqrt(constants.k_B * tex / (28*u.Da)).to(u.km/u.s)
+        sigmas_calc_thermal = tau_of_N(xarr, column, tex=tex, width=width, progressbar=lambda x: x) / column
+        sigmas_calc = tau_of_N(xarr, column, tex=tex, width=20*u.km/u.s, progressbar=lambda x: x) / column
+
+        ax = pl.subplot(3, 3, ii+1)
+        ax.cla()
+        pl.plot(xarr, sigmas_calc_thermal, label=f'$\\sigma={width:0.1f}$')
+        pl.plot(xarr, sigmas_calc, label='$\\sigma=20$ km/s')
+
+        pl.axhline(1e-18, linestyle='--', color='k', alpha=0.5)
+        pl.axhline(1e-15, linestyle=':', color='k', alpha=0.5)
+        pl.semilogy()
+        ymin, ymax = pl.ylim()
+        pl.ylim(1e-19, 1e-14)
+        pl.legend(loc='best')
+        pl.xlabel("Wavelength [cm$^{-1}$]")
+        pl.ylabel("Cross Section [cm$^{-2}$]")
+        pl.title(tex)
+
+    return
 
 def test_vs_pyspeckitmodel():
     import pyspeckitmodels
@@ -475,3 +517,35 @@ def test_vs_pyspeckitmodel():
     pl.xlabel("Wavelength [$\mu$m]")
     pl.ylabel("$\\tau(N(\\mathrm{CO})=10^{18})~\mathrm{cm^{-2}}$")
     pl.title("Failed sanity check: the opacities from exomol seem to be ~3 orders of magnitude lower")
+
+def tau_plot_colloop():
+    # numin, numax, dnu = 3.815033, 3.895033, 0.01
+    # numin, numax, dnu = 2142.245, 2143.245, 0.01
+
+    xarr = np.linspace(4.56581*u.um, 4.74688*u.um, int(1e5))
+    import pylab as pl
+    fig = pl.figure(1)
+    fig.clf()
+    for ii, column in enumerate(np.linspace(14, 22, 9, dtype=int)):
+        tex = 50*u.K
+        width = np.sqrt(constants.k_B * tex / (28*u.Da)).to(u.km/u.s)
+        width = 1*u.km/u.s
+        optical_depth_thermal = tau_of_N(xarr, 10.**column, tex=tex, width=width, progressbar=lambda x: x)
+        optical_depth = tau_of_N(xarr, 10.**column, tex=tex, width=20*u.km/u.s, progressbar=lambda x: x)
+
+        ax = pl.subplot(3, 3, ii+1)
+        ax.cla()
+        pl.plot(xarr, 1-np.exp(-optical_depth_thermal), label=f'$\\sigma={width:0.1f}$')
+        pl.plot(xarr, 1-np.exp(-optical_depth), label='$\\sigma=20$ km/s')
+
+        pl.axhline(1e-18, linestyle='--', color='k', alpha=0.5)
+        pl.axhline(1e-15, linestyle=':', color='k', alpha=0.5)
+        #pl.semilogy()
+        ymin, ymax = pl.ylim()
+        #pl.ylim(1e-19, 1e-14)
+        pl.legend(loc='best')
+        pl.xlabel("Wavelength [cm$^{-1}$]")
+        pl.ylabel("Transmission Fraction")
+        pl.title(f'N$=10^{{{column}}}$ cm$^{{-2}}$')
+
+    pl.tight_layout()

@@ -14,6 +14,7 @@ student.  It looks like I never had a good reference spectrum to check against.
 """
 
 from astropy.io import ascii
+import warnings
 import numpy as np
 import pyspeckit
 from pyspeckit import units
@@ -50,9 +51,18 @@ except Exception as ex:
     print(ex)
     raise
 
-def tau_of_N(wavelength, column, tex=10, width=1.0, velocity=0.0,
-             isotopomer=26, Be=57.63596828e9, unit_convention='cgs',
-             width_units='km/s', velocity_units='km/s'):
+from co.exomol_co_vibration import tau_of_N as exo_tau_of_N
+def tau_of_N(*args, **kwargs):
+    for argname in ('Be', 'isotopomer', 'unit_convention', 'width_units', 'velocity_units'):
+        if argname in kwargs:
+            warnings.warn(f"{argname} parameter is deprecated", DeprecationWarning)
+            kwargs.pop(argname)
+    return exo_tau_of_N(*args, **kwargs)
+
+
+def deprecated_tau_of_N(wavelength, column, tex=10, width=1.0, velocity=0.0,
+                        isotopomer=26, Be=57.63596828e9, unit_convention='cgs',
+                        width_units='km/s', velocity_units='km/s'):
     """
     Wavelength assumed to be an array cm
 
