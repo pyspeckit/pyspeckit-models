@@ -1,6 +1,12 @@
 """
 Model the absorption spectrum of vibrational states of a species retrieved from
 exomol
+
+
+References:
+
+    https://hitran.org/docs/definitions-and-units/
+    https://ui.adsabs.harvard.edu/abs/2018A%26A...614A.131Y/abstract
 """
 
 import numpy as np
@@ -40,12 +46,14 @@ if os.path.exists(levels_fn):
     levels = Table.read(levels_fn)
 else:
     levels = Vizier(row_limit=1e7).get_catalogs('J/MNRAS/434/1469/levels')[0]
+    levels = levels[levels['Mol'] == 2816]
     levels.write(levels_fn)
 transitions_fn = os.path.join(path, 'sio_transitions.ecsv')
 if os.path.exists(transitions_fn):
     transitions = Table.read(transitions_fn)
 else:
     transitions = Vizier(row_limit=1e8).get_catalogs('J/MNRAS/434/1469/transit')[0]
+    transitions = transitions[transitions['Mol'] == 2816]
     transitions.write(transitions_fn)
 
 
@@ -69,10 +77,10 @@ else:
         # should already be sorted, but just to be sure
         sublevels.sort('i')
         # indices are the transition number minus one
-        eupper[transmatches] = sublevels[subtrans['i0']-1]['E']
-        elower[transmatches] = sublevels[subtrans['i1']-1]['E']
-        gupper[transmatches] = sublevels[subtrans['i0']-1]['g']
-        glower[transmatches] = sublevels[subtrans['i1']-1]['g']
+        eupper[transmatches] = sublevels[subtrans['i1']-1]['E']
+        elower[transmatches] = sublevels[subtrans['i0']-1]['E']
+        gupper[transmatches] = sublevels[subtrans['i1']-1]['g']
+        glower[transmatches] = sublevels[subtrans['i0']-1]['g']
         assert np.all(eupper > elower)
 
     wavelengths = (eupper - elower).to(u.um, u.spectral())
