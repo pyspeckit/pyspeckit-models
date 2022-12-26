@@ -184,7 +184,12 @@ def tau_of_N(wavelength, column, tex=10*u.K, width=1.0*u.km/u.s,
 
     # not used prefactor = np.pi**0.5 * constants['e']**2 / constants['me'] / constants['c']
 
-    wavelength = wavelength.to(u.cm, u.spectral())
+    column = u.Quantity(column, u.cm**-2)
+    wavelength = u.Quantity(wavelength, u.cm).to(u.cm, u.spectral())
+    tex = u.Quantity(tex, u.K)
+    width = u.Quantity(width, u.km/u.s)
+    velocity = u.Quantity(velocity, u.km/u.s)
+
     # wavenumber = wavelength.to(u.cm**-1, u.spectral())
     dx_icm = np.abs(wavelength[1].to(u.cm**-1, u.spectral())-wavelength[0].to(u.cm**-1, u.spectral()))
     # dx = np.abs(wavelength[1] - wavelength[0]).to(u.um)
