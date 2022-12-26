@@ -286,8 +286,9 @@ def tau_of_N(wavelength, column, tex=10*u.K, width=1.0*u.km/u.s,
         # print(f"Max cross-section: {crosssection.max().to(u.cm**2)}     =     {crosssection.max().to(u.barn)}")
 
         tau_v = (crosssection * column).decompose()
+        assert tau_v.unit.is_equivalent(u.dimensionless_unscaled)
         # print(f'max tau: {tau_v.max()}')
-        tau_total += tau_v
+        tau_total += tau_v.value
 
     return tau_total
 
@@ -432,3 +433,40 @@ def test_tloop():
     pl.semilogy(tems[::-1], ratios)
     pl.semilogy(tems[::-1], ratios2)
     return sigmas, sigmas_calc, ratios, ratios2
+
+
+def test_vs_pyspeckitmodel():
+    import pyspeckitmodels
+    import pylab as pl
+
+    fig = pl.figure(1)
+    fig.clf()
+
+    xarr = np.linspace(4.56581*u.um, 4.74688*u.um, int(5e4))
+
+    T = 100
+    width = ((constants.k_B * T*u.K / (28*u.Da))**0.5).to(u.km/u.s)
+    column = 1e18
+    L, = pl.plot(xarr,
+                 pyspeckitmodels.co_vibration.tau_of_N(xarr.to(u.cm).value, column, T, width=width.value),
+                 label=f"T={T} K, $\\sigma$={width:0.2f}")
+
+    taus_calc = tau_of_N(xarr, column, tex=T*u.K, width=width, progressbar=lambda x: x)
+    L, = pl.plot(xarr,
+                 taus_calc,
+                 label=f"T={T} K, $\\sigma$={width:0.2f} [exomol calc]")
+
+    # sanity check based on exomol
+    exomol_sigmas = exomol_xsec(np.round(xarr.max().to(u.cm**-1, u.spectral()).value),
+                                np.round(xarr.min().to(u.cm**-1, u.spectral()).value),
+                                dnu=0.01,
+                                temperature=T)
+    wl_exo = (np.arange(np.round(xarr.max().to(u.cm**-1, u.spectral()).value),
+                        np.round(xarr.min().to(u.cm**-1, u.spectral()).value)+0.005,
+                        0.01)*u.cm**-1).to(u.um, u.spectral())
+    pl.plot(wl_exo, exomol_sigmas * column*u.cm**-2, label='ExoMol')
+
+    pl.legend(loc='best')
+    pl.xlabel("Wavelength [$\mu$m]")
+    pl.ylabel("$\\tau(N(\\mathrm{CO})=10^{18})~\mathrm{cm^{-2}}$")
+    pl.title("Failed sanity check: the opacities from exomol seem to be ~3 orders of magnitude lower")
