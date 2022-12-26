@@ -69,6 +69,7 @@ else:
 transitions_enhanced_fn = os.path.join(path, 'co_transitions_enhanced.ecsv')
 if os.path.exists(transitions_enhanced_fn):
     transitions = transitions_enhanced = Table.read(transitions_enhanced_fn)
+    assert np.all(transitions['eupper'] > transitions['elower'])
 else:
     print("Calculating wavelengths, etc.  This may take a while")
     eupper = np.zeros(len(transitions), dtype=np.float64) * u.cm**-1
