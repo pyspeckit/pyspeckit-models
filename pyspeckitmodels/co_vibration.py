@@ -51,7 +51,7 @@ except Exception as ex:
     print(ex)
     raise
 
-from co.exomol_co_vibration import tau_of_N as exo_tau_of_N
+from pyspeckitmodels.co.exomol_co_vibration import tau_of_N as exo_tau_of_N
 def tau_of_N(*args, **kwargs):
     for argname in ('Be', 'isotopomer', 'unit_convention', 'width_units', 'velocity_units'):
         if argname in kwargs:
