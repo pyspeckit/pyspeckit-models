@@ -308,10 +308,15 @@ def tau_of_N(wavelength, column, tex=10*u.K, width=1.0*u.km/u.s,
 
 
 
-def exomol_xsec(numin, numax, dnu, temperature, molecule='12C-16O'):
+def exomol_xsec(numin, numax, dnu, temperature, molecule='12C-16O', parent_molecule='12C-16O'):
+    """
+    Retrieve cross-sections for a molecule over a specified range
+
+    The 'parent molecule' name is the folder.  For example, 13CO is in the 12CO folder
+    """
     S = requests.Session()
     S.headers['User-Agent'] = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/108.0.0.0 Safari/537.36'
-    url = f"https://exomol.com/xsec/{molecule}/"
+    url = f"https://exomol.com/xsec/{parent_molecule}/"
     resp = S.get(url)
     resp.raise_for_status()
     from bs4 import BeautifulSoup
