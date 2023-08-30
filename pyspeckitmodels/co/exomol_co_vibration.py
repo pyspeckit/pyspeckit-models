@@ -44,13 +44,14 @@ else:
     resp.raise_for_status
     tablefile = bz2.BZ2File(BytesIO(resp.content))
     levels = ascii.read(tablefile)
-    levels.rename_column('col1', 'i')
-    levels.rename_column('col2', 'E')
+    # defined in table 10 of arxiv 1603.05890
+    levels.rename_column('col1', 'i') # state ID
+    levels.rename_column('col2', 'E') # state energy
     levels['E'].unit = u.cm**-1
-    levels.rename_column('col3', 'g')
-    levels.rename_column('col4', 'j')
-    levels.rename_column('col5', 'v')
-    levels.rename_column('col6', 'letter_e')
+    levels.rename_column('col3', 'g') # degeneracy
+    levels.rename_column('col4', 'j') # J qn
+    levels.rename_column('col5', 'v') # v qn
+    levels.rename_column('col6', 'letter_e') # electronic state?
     levels.write(levels_fn)
 
 transitions_fn = os.path.join(path, 'co_transitions.ecsv')
@@ -61,8 +62,9 @@ else:
     resp.raise_for_status
     tablefile = bz2.BZ2File(BytesIO(resp.content))
     transitions = ascii.read(tablefile)
-    transitions.rename_column('col1', 'i0')
-    transitions.rename_column('col2', 'i1')
+    # defined in Table 12 of arxiv 1603.05890
+    transitions.rename_column('col1', 'upper')
+    transitions.rename_column('col2', 'lower')
     transitions.rename_column('col3', 'A')
     transitions['A'].unit = u.s**-1
     transitions.rename_column('col4', 'wavelength_')
@@ -84,10 +86,10 @@ else:
     # should already be sorted, but just to be sure
     levels.sort('i')
     # indices are the transition number minus one
-    eupper = levels[transitions['i0']-1]['E']
-    elower = levels[transitions['i1']-1]['E']
-    gupper = levels[transitions['i0']-1]['g']
-    glower = levels[transitions['i1']-1]['g']
+    eupper = levels[transitions['upper']-1]['E']
+    elower = levels[transitions['lower']-1]['E']
+    gupper = levels[transitions['upper']-1]['g']
+    glower = levels[transitions['lower']-1]['g']
     assert np.all(eupper > elower)
 
     wavelengths = np.abs((eupper - elower).to(u.um, u.spectral()))
@@ -177,7 +179,7 @@ def tau_of_N(wavelength, column, tex=10*u.K, width=1.0*u.km/u.s,
     isotopomer : int
         Must be a four-digit integer.  Each digit refers to the last digit in C
         or O, e.g. for the standard 12C16O, the number is 1216.
-        30Si16O would be 3016.
+        30Slower6O would be 3016.
     wavelength : quantity
         wavelength
     width : velocity
